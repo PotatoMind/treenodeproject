@@ -8,12 +8,13 @@
     <style>
         .node circle {
             fill: lightgreen;
-            stroke-width: 1.5px;
         }
         
         .node text {
-            font: 5px sans-serif;
+            font: 15px sans-serif;
             font-weight: bold;
+            word-break: break-all; 
+            word-wrap: break-word;
         }
         
         .link {
@@ -42,8 +43,7 @@
 
 <body>
     <script>
-        var margin = { top: 20, right: 20, bottom: 20, left: 20 },
-            width = $(window).width() * 0.9,
+        var width = $(window).width() * 0.9,
             height = $(window).height() * 0.9;
 
         var i = 0,
@@ -51,62 +51,70 @@
             root;
 
         var tree = d3.layout.tree()
-            .size([height, width]);
+            .nodeSize([40,])
+            .separation(function separation(a, b) {
+                return a.parent == b.parent ? 5 : 5;
+            });
 
         var diagonal = d3.svg.diagonal()
             .projection(function (d) { return [d.y, d.x]; });
+
+        var zoom = d3.behavior.zoom().translate([width / 2, height / 2]).scale(1);
+
         var svg = d3.select("body").append("svg")
             .attr("width", width)
             .attr("height", height)
             .attr("display", "block")
+            .call(zoom.on("zoom", zooming))
             .append("g")
             .attr("pointer-events", "all");
         
-
-        var rect = svg.append("rect")
-            .attr("x", 0)
-            .attr("y", 0)
-            .attr("width", $(window).width())
-            .attr("height", $(window).height())
-            .attr("fill", "white");
-
-        d3.select("svg")
-            .call(d3.behavior.zoom()
-                .scaleExtent([0.5, 10])
-                .on("zoom", zoom));
-        function zoom() {
+        // Centers the tree or "g"
+        d3.select("svg").select("g")
+            .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+        
+        // Zoom function
+        function zooming() {
             svg.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
         }
 
+        // Returns a list of all nodes under the root.
+        function flatten(root) {
+            var nodes = [], i = 0;
+
+            function recurse(node) {
+                if (node.children) node.children.forEach(recurse);
+                if (!node.id) node.id = ++i;
+                nodes.push(node);
+            }
+
+            recurse(root);
+            return nodes;
+        }
+
+        // Gets root and updates tree 
         d3.json("flare.json", function (error, flare) {
             if (error) throw error;
 
             root = flare;
             root.x0 = height / 2;
-            root.y0 = 0;
+            root.y0 = width / 2;
 
-            function collapse(d) {
-                if (d.children) {
-                    d._children = d.children;
-                    d._children.forEach(collapse);
-                    d.children = null;
-                }
-            }
-
-            root.children.forEach(collapse);
+            var nodes = flatten(root);
+            nodes.forEach(function(d) {
+                d._children = d.children;
+                d.children = null;
+            })
             update(root);
         });
 
-        d3.select(self.frameElement).style("height", "800px");
-
         function update(source) {
-
             // Compute the new tree layout.
             var nodes = tree.nodes(root).reverse(),
                 links = tree.links(nodes);
 
             // Normalize for fixed-depth.
-            nodes.forEach(function (d) { d.y = d.depth * 180; });
+            nodes.forEach(function (d) { d.y = d.depth * 360; });
 
             // Update the nodes…
             var node = svg.selectAll("g.node")
@@ -116,11 +124,11 @@
             var nodeEnter = node.enter().append("g")
                 .attr("class", "node")
                 .attr("xlink:href", function (d) { return d.link })
-                .attr("transform", function (d) { return "translate(" + source.y0 + "," + source.x0 + ")"; })
+                .attr("transform", function (d) {return "translate(" + source.y0 + "," + source.x0 + ")"; })
                 .on("click", click);
 
             nodeEnter.append("circle")
-                .attr("r", 10)
+                .attr("r", function (d) { return d._children ? 50 : 40; })
                 .style("fill", function (d) { return d._children ? "#FFFF94" : "pink"; });
 
             nodeEnter.append("text")
@@ -138,7 +146,7 @@
                 .attr("transform", function (d) { return "translate(" + d.y + "," + d.x + ")"; });
 
             nodeUpdate.select("circle")
-                .attr("r", 10)
+                .attr("r", function (d) { return d.children !== undefined ? 75 : (d._children ? 60 : 45); })
                 .style("fill", function (d) { return d.children !== undefined ? "lightgreen" : (d._children ? "#FFFF94" : "pink"); });
 
 
@@ -155,7 +163,7 @@
                 .remove();
 
             nodeExit.select("circle")
-                .attr("r", 10);
+                .attr("r", 40);
 
             nodeExit.select("text")
                 .style("fill-opacity", 10);
@@ -167,6 +175,7 @@
             // Enter any new links at the parent's previous position.
             link.enter().insert("path", "g")
                 .attr("class", "link")
+                .attr("stroke-width", 5)
                 .attr("d", function (d) {
                     var o = { x: source.x0, y: source.y0 };
                     return diagonal({ source: o, target: o });
@@ -195,7 +204,6 @@
 
         // Toggle children on click.
         function click(d) {
-            console.log(d);
             if (d.children) {
                 d._children = d.children;
                 d.children = null;

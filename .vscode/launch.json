@@ -2,6 +2,12 @@
     "version": "0.1.0",
     "configurations": [
         {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Program",
+            "program": "${workspaceRoot}/index.html"
+        },
+        {
             "name": "Launch localhost",
             "type": "chrome",
             "request": "launch",
@@ -9,11 +15,12 @@
             "file": "${workspaceRoot}/index.html"
         },
         {
-            "name": "Launch index.html (disable sourcemaps)",
+            "name": "Attach to Chrome",
+            "request": "attach",
             "type": "chrome",
-            "request": "launch",
-            "sourceMaps": false,
-            "file": "${workspaceRoot}/index.html"
+            "port": 80,
+            "sourceMaps": true,
+            "webRoot": "${workspaceRoot}"
         }
     ]
 }
